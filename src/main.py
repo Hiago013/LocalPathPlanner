@@ -43,32 +43,32 @@ def remove_dups(lista):
     """Remove os itens duplicados mantendo a ordem original."""
     return list(dict.fromkeys(lista))
 
-def state2cartesian(state):
-    y, x = divmod(state, 10)
+def state2cartesian(state, col:int):
+    y, x = divmod(state, col)
     return x * 50, y * 50
 
-def cartesian2state(cartesian_point):
+def cartesian2state(cartesian_point, col:int):
     x, y = cartesian_point
     x = x // 50
     y = y // 50
-    return 10 * x + y
+    return col * x + y
 
 #####
 
-def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:int):
+def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:int, col:int):
     global SUBGOAL
     if agent_position == sub_goal[SUBGOAL]:
         print(agent_position)
         SUBGOAL += 1
     obstacle = env.obstacles
-    points_obstacles = [np.array((state2cartesian(state))) for state in obstacle]
-    points_global_goal = np.array((state2cartesian(env.cart2s(env.goal))))
-    points_sub_goal = [np.array((state2cartesian(state))) for state in sub_goal]
-    points_mini_grid = [np.array((state2cartesian(state))) for state in init_mini_grid]
+    points_obstacles = [np.array((state2cartesian(state, col=col))) for state in obstacle]
+    points_global_goal = np.array((state2cartesian(env.cart2s(env.goal), col=col)))
+    points_sub_goal = [np.array((state2cartesian(state, col=col))) for state in sub_goal]
+    points_mini_grid = [np.array((state2cartesian(state, col=col))) for state in init_mini_grid]
   
 
     
-    img = np.zeros((500, 500, 3), dtype='uint8')
+    img = np.zeros((50 * col, 50 * col, 3), dtype='uint8')
 ##      # Desenhar elementos estaticos
     for point in points_obstacles:
         cv2.rectangle(img, point, point + 50, (0, 0, 255), 5)
@@ -84,7 +84,7 @@ def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:
     while time.time() < t_end:
         continue
 
-    agent_point = np.array(state2cartesian(agent_position))
+    agent_point = np.array(state2cartesian(agent_position, col=col))
     cv2.rectangle(img, agent_point, agent_point + 50, [255, 0, 0], 3)
     
     cv2.imshow('Grid_World', img)
@@ -105,7 +105,7 @@ def create_gif(len_path:int):
     # Salva o GIF
     imageio.mimsave('animation.gif', images, duration= .5)
 
-index = 23
+index = 12
 if opr!='linux':
     print('We are working on a Windows system')
     path = f"src\mapasICUAS\mapaEscolhido{index}.txt"
@@ -131,7 +131,7 @@ startPos = (0, 0, 0) # Posicao inicial do agente no mapa
 goalPos = (row-1, col-1, 0) # Objetivo global do agente
 grid_world = GridWorld(row, col, height, startPos, -0.4, -0.4, -0.4, 100)
 path = []
-GRID_SIZE = 5
+GRID_SIZE = 4
 sub_goal = []
 init_mini_grid = []
 
@@ -177,5 +177,5 @@ print(path)
 print(init_mini_grid)
 
 for idx, position in enumerate(path):
-    visualizar(mini_grid, path = path, sub_goal = sub_goal, agent_position=position, step=idx)
+    visualizar(mini_grid, path = path, sub_goal = sub_goal, agent_position=position, step=idx, col = col)
 create_gif(len(path))
