@@ -48,6 +48,19 @@ class GridWorld:
         self.actions = {}
         self.get_energyCost()
         self.QTable=[]
+    
+    def get_obstacles(self):
+        return self.obstacles
+    
+    def set_obstacles(self, obstacles):
+        self.obstacles = obstacles
+        self.get_reward_safety()
+    
+    def get_current_position(self):
+        return self.i, self.j, self.k
+    
+    def set_current_position(self, position:tuple):
+        self.i, self.j, self.k = position
         
     def get_energyCost(self):
         '''
