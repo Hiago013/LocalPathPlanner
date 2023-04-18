@@ -17,6 +17,7 @@ from sys import platform
 opr=platform
 import cv2
 import imageio
+from dynamic_obstacle import dynamic_obstacle as dynobs
 
 
 def set_goal_minigrid(current_position:int, goal_position:int, minigrid_size:int):
@@ -31,17 +32,45 @@ def set_goal_minigrid(current_position:int, goal_position:int, minigrid_size:int
                     goal = (i, j, 0)
     return goal
 
+def set_goal_minigrid2(start_grid:tuple, end_grid:tuple, goal_position:int, minigrid_size:int):
+    xi, yi, zi = start_grid
+    xe, ye, ze = end_grid
+    xg, yg, zg = goal_position
+    min_dist = 10000
+    for i in range(xi, xe + 1):
+        for j in range(yi, ye + 1):
+            if abs(i - xg) + abs(j - yg) < min_dist:
+                if grid_world.cart2s((i, j, 0)) not in mini_grid.obstacles:
+                    min_dist = abs(i - xg) + abs(j - yg)
+                    goal = (i, j, 0)
+    return goal
+
 def set_bounds(startPosition, row, col):
     x, y, z = startPosition
-    new_x, new_y, new_z = x, y, z
-    end_x, end_y, end_z = x + GRID_SIZE - 1, y + GRID_SIZE-1, 0
-    if x + GRID_SIZE -1 > row -1:
-        new_x = x - (x + GRID_SIZE - row)
+
+    new_x, new_y, new_z = x - int(GRID_SIZE/2), y - int(GRID_SIZE/2), 0
+    if GRID_SIZE % 2 == 0: #If grid size is a even number
+        end_x, end_y, end_z = x + int(GRID_SIZE/2) - 1, y + int(GRID_SIZE/2) - 1, 0
+    else:
+        end_x, end_y, end_z = x + int(GRID_SIZE/2) - 0 , y + int(GRID_SIZE/2)-0 , 0
+
+    if new_x < 0:
+        new_x = 0
+        end_x = x + GRID_SIZE - 1
+    
+    if new_y < 0:
+        new_y = 0
+        end_y = y + GRID_SIZE - 1
+
+    if end_x > row -1:
+        new_x = row - GRID_SIZE#x - (x + GRID_SIZE - row)
         end_x = row - 1
-    if y + GRID_SIZE -1 > col -1:
-        new_y = y - (y + GRID_SIZE - col)
+
+    if end_y > col -1:
+        new_y = col - GRID_SIZE#y - (y + GRID_SIZE - col)
         end_y = col - 1
     return [(new_x, new_y, new_z), (end_x, end_y, end_z)]
+
 
     #mini_grid.setMiniGrid(startPos, (min(startPos[0] + GRID_SIZE - 1, row - 1), min(startPos[1] + GRID_SIZE - 1, col - 1), 0))
     #pass
@@ -60,6 +89,21 @@ def cartesian2state(cartesian_point):
     y = y // 50
     return 10 * x + y
 
+def move_obstacle(obstacle_position:tuple, obstacles:list, grid_world:GridWorld):
+    xo, yo, zo = obstacle_position
+    possible_obstacles = []
+    for i in range(xo-1, xo+2):
+        for j in range(yo-1, yo+2):
+            # Check if obstacle is into the environment
+            if i >= 0 and j>= 0:
+                if i < grid_world.rows and j < grid_world.cols:
+                    # Check if obstacle chosen already there
+                    # Check if the new obstacle postion is the current agent position
+                    if (not grid_world.cart2s((i,j,zo)) in obstacles) and \
+                    (not (i,j,zo) == grid_world.get_current_position()):
+                        possible_obstacles.append(grid_world.cart2s((i,j,zo)))
+    return grid_world.s2cart(np.random.choice(possible_obstacles))
+
 #####
 
 def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:int):
@@ -69,21 +113,25 @@ def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:
         SUBGOAL += 1
     obstacle = env.obstacles
     points_obstacles = [np.array((state2cartesian(state))) for state in obstacle]
-    points_global_goal = np.array((state2cartesian(env.cart2s(env.goal))))
+    points_global_goal = np.array((state2cartesian(env.cart2s(env.goal))),dtype=int)
     points_sub_goal = [np.array((state2cartesian(state))) for state in sub_goal]
     points_mini_grid = [np.array((state2cartesian(state))) for state in init_mini_grid]
-  
+ 
 
     
     img = np.zeros((500, 500, 3), dtype='uint8')
 ##      # Desenhar elementos estaticos
-    for point in points_obstacles:
-        cv2.rectangle(img, point, point + 50, (0, 0, 255), 5)
+    for x, y in points_obstacles:
+        cv2.rectangle(img, (int(x), int(y)), (int(x) + 50, int(y) + 50), (0, 0, 255), 5)
     
-    cv2.rectangle(img, points_global_goal, points_global_goal + 50, (0, 255, 0), 5)
+    cv2.rectangle(img, (points_global_goal[0], points_global_goal[1]),\
+                   ( points_global_goal[0]+ 50, points_global_goal[0]+50), (0, 255, 0), 5)
     try:
-        cv2.rectangle(img, points_sub_goal[SUBGOAL], points_sub_goal[SUBGOAL] + 50, (0, 150, 0), 5)
-        cv2.rectangle(img, points_mini_grid[SUBGOAL], points_mini_grid[SUBGOAL] + 50 * GRID_SIZE, (0, 80, 0), 5)
+        x, y = points_sub_goal[SUBGOAL]
+        x2, y2 = points_mini_grid[SUBGOAL]
+
+        cv2.rectangle(img, (x, y), (x + 50, y + 50), (0, 150, 0), 5)
+        cv2.rectangle(img, (x2, y2), (x2  + 50 * GRID_SIZE, y2 + 50 * GRID_SIZE), (0, 80, 0), 5)
     except:
         pass
      #Takes step after fixed time
@@ -91,13 +139,50 @@ def visualizar(env:MiniGrid, path:list, sub_goal:list, agent_position:int, step:
     while time.time() < t_end:
         continue
 
-    agent_point = np.array(state2cartesian(agent_position))
-    cv2.rectangle(img, agent_point, agent_point + 50, [255, 0, 0], 3)
+    x, y = np.array(state2cartesian(agent_position))
+    cv2.rectangle(img, (x, y), (x + 50, y+ 50), [255, 0, 0], 3)
     
     cv2.imshow('Grid_World', img)
     cv2.waitKey(1)
     cv2.imwrite(f"nova_imagem{step}.jpg", img)
     pass
+
+def create_an_image(env:MiniGrid, sub_goal:int, agent_position:int, init_mini_grid:int, step:int):
+    obstacle = env.obstacles
+    points_obstacles = [np.array((state2cartesian(state))) for state in obstacle]
+    points_sub_goal = np.array((state2cartesian(sub_goal)))
+    points_mini_grid = np.array((state2cartesian(init_mini_grid)))
+ 
+
+    
+    img = np.zeros((500, 500, 3), dtype='uint8')
+##      # Desenhar elementos estaticos
+    for x, y in points_obstacles:
+        cv2.rectangle(img, (int(x), int(y)), (int(x) + 50, int(y) + 50), (0, 0, 255), 5)
+
+    try:
+        x, y = points_sub_goal
+        x2, y2 = points_mini_grid
+
+        cv2.rectangle(img, (x, y), (x + 50, y + 50), (0, 255, 255), 5)
+        cv2.rectangle(img, (x2, y2), (x2  + 50 * GRID_SIZE, y2 + 50 * GRID_SIZE), (255, 0, 255), 5)
+    except:
+        pass
+     #Takes step after fixed time
+    #t_end = time.time() + 0# + 0 é o delay entre frame para visualização (nao para o gif)
+    #while time.time() < t_end:
+    #    continue
+
+    x, y = np.array(state2cartesian(agent_position))
+    cv2.rectangle(img, (x, y), (x + 50, y+ 50), [255, 0, 0], 3)
+    
+    cv2.imshow('Grid_World', img)
+    cv2.waitKey(1)
+
+    cv2.imwrite(f"nova_imagem{step}.jpg", img)
+    pass
+
+
 
 def create_gif(len_path:int):
 
@@ -159,26 +244,33 @@ grid_world.set_obstacles(obstacles)
 grid_world.get_reward_safety()
 path = []
 GRID_SIZE = 5
+SUBGOAL = 0
 sub_goal = []
 init_mini_grid = []
 real_path = []
 
+obs1 = dynobs(grid_world=grid_world, current_position=(2,2,0), static_obstacles=obstacles)
+obs2 = dynobs(grid_world=grid_world, current_position=(7,7,0), static_obstacles=obstacles)
 # Configurando minigrid
 
-
+new_image_index = 0
 while startPos != goalPos:
     # Configurar Minigrid
-    mini_grid = MiniGrid(row, col, height, startPos, -0.4, -0.4, -0.4, 100)
-    mini_grid.setObstacles(obstacles)
+    mini_grid = MiniGrid(row, col, height, startPos, 0, -0.4, -0.4, 100)
+    mini_grid.setObstacles(grid_world.get_obstacles())
     init_grid, end_grid = set_bounds(startPos, row, col)
+    print(init_grid, end_grid)
     mini_grid.setMiniGrid(init_grid, end_grid)
     mini_grid.setPosition(startPos)
-    goal_minigrid = set_goal_minigrid(grid_world.cart2s(init_grid), grid_world.cart2s(goalPos), GRID_SIZE)
+    #goal_minigrid = set_goal_minigrid(grid_world.cart2s(init_grid), grid_world.cart2s(goalPos), GRID_SIZE)
+    goal_minigrid = set_goal_minigrid2(init_grid, end_grid, goalPos, GRID_SIZE)
     sub_goal.append(mini_grid.cart2s(goal_minigrid))
     init_mini_grid.append(mini_grid.cart2s(init_grid))
     mini_grid.setGoal(goal_minigrid)
     mini_grid.actionSpace()
     mini_grid.get_reward_safety()
+
+    init_mini_grid1 = mini_grid.cart2s(init_grid) # to mexendo nesse aqui
 
     # Treinamento Local
     Num_Ep_local = 1000
@@ -187,52 +279,81 @@ while startPos != goalPos:
     localAgent.enviroment.PrintBestPath(localAgent.Q, 0, localAgent.getBestPath(startPos))
     print(localAgent.getBestPath(startPos))
     path = localAgent.getBestPath(startPos)
-    
 
+    print(grid_world.get_current_position())
+    if new_image_index == 0:
+        create_an_image(mini_grid, sub_goal=mini_grid.cart2s(goal_minigrid), \
+                    agent_position=grid_world.cart2s(grid_world.get_current_position()),\
+                    init_mini_grid=init_mini_grid1,
+                        step = new_image_index)
+        new_image_index += 1
     # Agente seguindo o caminho
     count = 0
+    
     while grid_world.get_current_position() != goal_minigrid:
         new_state, _, _= grid_world.step(localAgent.chooseBestAction(path[count]))
+        del path[0]
         grid_world.set_current_position(new_state)
         grid_world.onMap()
-        count += 1
+        #count += 1
         print('\n')
-        if np.random.rand() > .5: # Aparece um obstaculo aleatorio 50% das vezes na frente do robo
-            if path[-1] != grid_world.cart2s(new_state): # Se não estiver no ultimo ultimo estado do caminho
-                count -= 1
-                print('Entrou')
-                startPos = grid_world.get_current_position()
-                grid_world.set_obstacles(grid_world.get_obstacles() + [path[count + 2]])
-                grid_world.get_reward_safety()
-                grid_world.onMap()
-
-                mini_grid = MiniGrid(row, col, height, startPos, -0.4, -0.4, -0.4, 100)
-                mini_grid.setObstacles(grid_world.get_obstacles())
-                init_grid, end_grid = set_bounds(startPos, row, col)
-                mini_grid.setMiniGrid(init_grid, end_grid)
-                mini_grid.setPosition(startPos)
-                goal_minigrid = set_goal_minigrid(grid_world.cart2s(init_grid), grid_world.cart2s(goalPos), GRID_SIZE)
-                sub_goal.append(mini_grid.cart2s(goal_minigrid))
-                init_mini_grid.append(mini_grid.cart2s(init_grid))
-                mini_grid.setGoal(goal_minigrid)
-                mini_grid.actionSpace()
-                mini_grid.get_reward_safety()
-
-                Num_Ep_local = 1000
-                localAgent = local_train(mini_grid, Num_Ep_local, startPos)
-                #localAgent.getStats(startPos)
-                localAgent.enviroment.PrintBestPath(localAgent.Q, 0, localAgent.getBestPath(startPos))
-                print(localAgent.getBestPath(startPos))
-                path = localAgent.getBestPath(startPos)
-                count = 0
-                print('Saiu')
-                
-        real_path.append(new_state)
+        ### Starting here, new editions
+        obs1.random_move()
+        obs2.random_move()
+        grid_world.set_obstacles(obstacles + [grid_world.cart2s(obs1.get_current_position())] + \
+                                 [grid_world.cart2s(obs2.get_current_position())])
+        grid_world.get_reward_safety()
+        grid_world.onMap()
+        mini_grid.setObstacles(grid_world.get_obstacles())
+        print('\n')
         
+        if grid_world.cart2s(obs1.get_current_position()) in path or \
+            grid_world.cart2s(obs2.get_current_position()) in path:
+            print('ENTROOOU')
+            startPos = grid_world.get_current_position()
+            mini_grid = MiniGrid(row, col, height, startPos, 0, -0.4, -0.4, 100)
+            mini_grid.setObstacles(grid_world.get_obstacles())
+            init_grid, end_grid = set_bounds(startPos, row, col)
+            mini_grid.setMiniGrid(init_grid, end_grid)
+            mini_grid.setPosition(startPos)
+            #goal_minigrid = set_goal_minigrid(grid_world.cart2s(init_grid), grid_world.cart2s(goalPos), GRID_SIZE)
+            goal_minigrid = set_goal_minigrid2(init_grid, end_grid, goalPos, GRID_SIZE)
+            sub_goal.append(mini_grid.cart2s(goal_minigrid))
+            init_mini_grid.append(mini_grid.cart2s(init_grid))
+            mini_grid.setGoal(goal_minigrid)
+            mini_grid.actionSpace()
+            mini_grid.get_reward_safety()
 
+            Num_Ep_local = 1000
+            localAgent = local_train(mini_grid, Num_Ep_local, startPos)
+            localAgent.enviroment.PrintBestPath(localAgent.Q, 0, localAgent.getBestPath(startPos))
+            print(localAgent.getBestPath(startPos))
+            path = localAgent.getBestPath(startPos)
+            count = 0
+            init_mini_grid1 = mini_grid.cart2s(init_grid) # to mexendo nesse aqui
+            print('SAAAIIU')
+
+        real_path.append(new_state)
+        create_an_image(mini_grid, sub_goal=mini_grid.cart2s(goal_minigrid), \
+                   agent_position=grid_world.cart2s(grid_world.get_current_position()),\
+                   init_mini_grid=init_mini_grid1,
+                    step = new_image_index)
+        
+        
+        new_image_index += 1
     mini_grid.setPosition(startPos)
+    print('goal mini grid', goal_minigrid)
+    print('current pos', grid_world.get_current_position())
+    print('startPos', startPos)
+    print('obs1: ', obs1.get_current_position())
     startPos = goal_minigrid
-
+    if startPos == goalPos:
+        goalPos = (0, 0, 0) # Objetivo global do agente
+        grid_world = GridWorld(row, col, height, startPos, 0, -0.4, -0.4, 100)
+        grid_world.set_obstacles(obstacles)
+        grid_world.get_reward_safety()
+        grid_world.set_obstacles(obstacles + [grid_world.cart2s(obs1.get_current_position())] + \
+                                 [grid_world.cart2s(obs2.get_current_position())])
 SUBGOAL = 0
 path = remove_dups(path)
 print(path)
@@ -240,4 +361,4 @@ print(init_mini_grid)
 print(real_path)
 #for idx, position in enumerate(path):
 #    visualizar(mini_grid, path = path, sub_goal = sub_goal, agent_position=position, step=idx)
-#create_gif(len(path))
+create_gif(new_image_index)
