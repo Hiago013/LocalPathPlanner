@@ -1,3 +1,0 @@
-<launch>
-<node name="cleaner" pkg="local_planner_lars" type="local_planner.py"/>
-</launch>
