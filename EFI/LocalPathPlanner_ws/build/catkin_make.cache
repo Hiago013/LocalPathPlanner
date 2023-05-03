@@ -1,0 +1,2 @@
+local_planner_lars
+-DCATKIN_DEVEL_PREFIX=/home/ubuntu/LocalPathPlanner_ws/devel -DCMAKE_INSTALL_PREFIX=/home/ubuntu/LocalPathPlanner_ws/install -G Unix Makefiles

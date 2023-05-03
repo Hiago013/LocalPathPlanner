@@ -1,0 +1,8 @@
+prefix=/home/ubuntu/LocalPathPlanner_ws/install
+
+Name: local_planner_lars
+Description: Description of local_planner_lars
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
