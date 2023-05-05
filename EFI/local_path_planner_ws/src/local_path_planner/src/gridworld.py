@@ -61,6 +61,40 @@ class GridWorld:
     
     def set_current_position(self, position:tuple):
         self.i, self.j, self.k = position
+    
+    def refine_reward(self, action:int, previous_position:tuple, current_position:tuple):
+        x_p, y_p, z_p = previous_position
+        x_c, y_c, z_c = current_position
+        k = 9
+        if action == 4: ## ARRUMAR y_c -1 > 0
+            
+            if (self.cart2s((x_c, y_c - 1, z_c)) in self.get_obstacles()) and (y_c > 0) or \
+            (self.cart2s((x_c - 1, y_c, z_c)) in self.get_obstacles()) and (x_c > 0):
+              #  print('entrei4', self.cart2s(current_position))
+              #  print(self.cart2s((x_c -1, y_c, z_c)), self.cart2s((x_c , y_c - 1, z_c)))
+                return self.Kd * k
+            
+        elif action == 5:
+            if (self.cart2s((x_c, y_c + 1, z_c)) in self.get_obstacles()) and (y_c < self.rows - 1)or \
+            (self.cart2s((x_c - 1, y_c, z_c)) in self.get_obstacles()) and (x_c > 0):
+               # print('entrei5')
+                return self.Kd * k
+
+        elif action == 6:
+            if (self.cart2s((x_c, y_c - 1, z_c)) in self.get_obstacles()) and (y_c > 0) or \
+            (self.cart2s((x_c + 1, y_c, z_c)) in self.get_obstacles()) and (x_c < self.cols- 1):
+                #print('entrei6')
+                return self.Kd * k
+        
+
+        elif action == 7:
+            if (self.cart2s((x_c +1, y_c, z_c)) in self.get_obstacles()) and (x_c < self.cols - 1) or \
+            (self.cart2s((x_c , y_c + 1, z_c)) in self.get_obstacles()) and (y_c < self.rows - 1):
+                #print('entrei7')
+                return self.Kd * k
+
+        return 0
+
         
     def get_energyCost(self):
         '''
@@ -252,6 +286,7 @@ class GridWorld:
         
         reward += self.reward_safety[(new_i, new_j, new_k)] # reward of safety
         reward += self.get_reward() # reward of distance and energy
+        reward += self.refine_reward(action, (self.i, self.j, self.k), (new_i, new_j, new_k)) ## LINHA DO "TIRA QUINA"
         new_state = (new_i, new_j, new_k)
 
         if new_state == self.goal:

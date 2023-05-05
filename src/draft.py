@@ -210,6 +210,27 @@ def local_train(mini_grid: MiniGrid, Num_Ep_local:int, startPos:tuple):
     print('Tempo total de treino:',fim)
     return localAgent
 
+def check_diagonal_obstacles(obstacles_list:list, col)-> list:
+        new_list_obstacles = obstacles_list.copy()
+        print(obstacles_list)
+        for obstacle in sorted(obstacles_list):
+            #if obstacle == 59:
+                #print('ok')
+            if (obstacle + 1 + col in obstacles_list) and (obstacle % col < col):
+                new_list_obstacles.append(obstacle + 1)
+                new_list_obstacles.append(obstacle + col)
+            if (obstacle + 1 - col in obstacles_list) and (obstacle % col < col):
+                new_list_obstacles.append(obstacle + 1)
+                new_list_obstacles.append(obstacle - col)
+            if (obstacle -1 + col in obstacles_list) and (obstacle % col > 0):
+                new_list_obstacles.append(obstacle - 1)
+                new_list_obstacles.append(obstacle + col)
+            if (obstacle - 1 - col in obstacles_list) and (obstacle % col > 0):
+                new_list_obstacles.append(obstacle - 1)
+                new_list_obstacles.append(obstacle - col)
+        
+        return list(set(new_list_obstacles))
+
 
 index = 12
 #path = f"LARS_3DMaps\mapaLARS3D\map{index}Crescente.txt"
@@ -249,9 +270,20 @@ sub_goal = []
 init_mini_grid = []
 real_path = []
 
+
 obs1 = dynobs(grid_world=grid_world, current_position=(2,2,0), static_obstacles=obstacles)
 obs2 = dynobs(grid_world=grid_world, current_position=(7,7,0), static_obstacles=obstacles)
 # Configurando minigrid
+
+grid_world.onMap()
+new_obs = check_diagonal_obstacles(list(grid_world.get_obstacles()), col)
+print('\n\n')
+grid_world.set_obstacles(new_obs)
+grid_world.onMap()
+while True:
+    continue
+
+
 
 new_image_index = 0
 while startPos != goalPos:
@@ -361,4 +393,4 @@ print(init_mini_grid)
 print(real_path)
 #for idx, position in enumerate(path):
 #    visualizar(mini_grid, path = path, sub_goal = sub_goal, agent_position=position, step=idx)
-create_gif(new_image_index)
+#create_gif(new_image_index)
