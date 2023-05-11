@@ -12,10 +12,12 @@ class qlAgent:
         if double == True:
             self.__currentQTable = 1
             self.__best_action = 0
+        self.__first_action = None # The first action that was taken before the episode start
         
 
     def setEnviroment(self, enviroment):
         self.enviroment = enviroment
+        self.__first_action = self.enviroment.last_action
         self.setPossibleStates()
     
     def setPossibleStates(self):
@@ -74,14 +76,14 @@ class qlAgent:
         '''
         Set of possible states given the initial exploration constraints
         '''
-        xo, yo, zo = origin
-        x = np.arange(xo, xo+rows)
-        y = np.arange(yo, yo+cols)
-        totalStates = len(x) * len(y)
+        io, jo, ko = origin
+        i = np.arange(io, io+rows)
+        j = np.arange(jo, jo+cols)
+        totalStates = len(i) * len(j)
         self.states_ = np.zeros(totalStates, dtype=np.ushort)
         step = 0
-        for row in x:
-            for col in y:
+        for row in i:
+            for col in j:
                 self.states_[step] = self.enviroment.cart2s((row, col, 0))
                 step += 1
         self.removeStates(self.enviroment.obstacles)
@@ -134,10 +136,10 @@ class qlAgent:
         '''
         Update position of the agent in grid world
         '''
-        x, y, z = self.enviroment.s2cart(state)
-        self.enviroment.i = x
-        self.enviroment.j = y
-        self.enviroment.k = z
+        i, j, k = self.enviroment.s2cart(state)
+        self.enviroment.i = i
+        self.enviroment.j = j
+        self.enviroment.k = k
         self.enviroment.last_action = self.enviroment.current_action
 
 
@@ -206,12 +208,18 @@ class qlAgent:
             score = 0
             done = False
             TDerror = 0
+            self.enviroment.last_action = self.__first_action
             self.reset()
             if episode % frequency == 0:
                 self.chooseInitialState()
             while done == False:
                 state = self.enviroment.cart2s((self.enviroment.i, self.enviroment.j, self.enviroment.k))
-                action = self.chooseAction(state, episode)
+                try:
+                    action = self.chooseAction(state, episode)
+                except:
+                   # print('Estado:',state, 'Dict:',self.enviroment.actions[state],'Posição do Agente:',self.enviroment.i  ,self.enviroment.j,'Lista',self.states_, end='\r')
+                    #input('Vai')
+                    pass
                 self.updateAction(action)
                 newState, reward, done = self.move(action)
                 newState = self.enviroment.cart2s(newState)
@@ -276,10 +284,10 @@ class qlAgent:
         return distanceRank, energyRank, proximityRank
 
     def getRankDist(self, path):
-        xo, yo, zo = self.enviroment.s2cart(path[0])
-        xf, yf, zf = self.enviroment.s2cart(path[-1])
+        io, jo, ko = self.enviroment.s2cart(path[0])
+        ie, je, ke = self.enviroment.s2cart(path[-1])
         lengthPath = self.enviroment.get_distance(path)
-        euclideanDistance = np.linalg.norm([xf - xo, yf - yo])
+        euclideanDistance = np.linalg.norm([ie - io, je - jo])
         return euclideanDistance/lengthPath
 
     def getRankEnergy(self, path):
@@ -329,15 +337,15 @@ class qlAgent:
         return path
 
     def FindInPolicy(self, position : tuple, size : int = 1) -> dict:
-        x, y, z = position
-        x_possibles = np.arange(x - size, x + size + 1)
-        y_possibles = np.arange(y - size, y + size + 1)
-        z_possibles = np.arange(z - size, z + size + 1)
+        i, j, k = position
+        i_possibles = np.arange(i - size, i + size + 1)
+        j_possibles = np.arange(j - size, j + size + 1)
+        k_possibles = np.arange(k - size, k + size + 1)
         possibles_states = []
-        for x in x_possibles:
-            for y in y_possibles:
-                if x >= 0 and y >=0:
-                    possibles_states.append(self.enviroment.cart2s((x, y, 0)))
+        for i in i_possibles:
+            for j in j_possibles:
+                if i >= 0 and j >=0:
+                    possibles_states.append(self.enviroment.cart2s((i, j, 0)))
 
         for state in possibles_states:
             if state in self.enviroment.obstacles:

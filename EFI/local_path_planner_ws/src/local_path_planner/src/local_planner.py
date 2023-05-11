@@ -22,15 +22,17 @@ def opt2position(x_max :float, y_max:float, size:float, position:tuple)->tuple:
     current_10y = position[1] * 10
     size_10 = size * 10
 
-    x, y = int(current_10x/size_10), int(current_10y/size_10)
+    xcell, ycell = int(current_10x/size_10), int(current_10y/size_10)
     cell = (n_cols) * int(current_10y/size_10) + int(current_10x/size_10)
 
-    return x, y, cell
+    return xcell, ycell, cell
 
-def cell2opt(x_max:float, y_max:float, size:float, cell:int):
-    n_cols = int(x_max / size)
-    y_position, x_position  = divmod(cell, n_cols)
-    return (size * x_position + size/2, size * y_position + size/2)
+def cell2opt(x_max:float, y_max:float, cell_size:float, cell:int):
+    n_cols = int(x_max / cell_size)
+      
+    i,j= divmod(cell, n_cols)
+    y_cell, x_cell=i,j
+    return (cell_size * x_cell + cell_size/2, cell_size * y_cell + cell_size/2)
 
 
 
@@ -65,124 +67,187 @@ class MiniGrid(GridWorld):
     def is_onboard(self, cartesian_position):
         '''
         checks if the agent is in the environment and return true or false
+        init grid and endgrid (i,j)
         '''
-        x, y, z = cartesian_position
-        if x < self.initGrid[0]  or x > self.endGrid[0] or y < self.initGrid[1]  or y > self.endGrid[1]:
+        i, j, k = cartesian_position
+        if i < self.initGrid[0]  or i > self.endGrid[0] or j < self.initGrid[1]  or j > self.endGrid[1]:
             return 0
         return 1
     
+    def actionSpace(self):
+        '''
+        This function set the possible action space for each state removing actions that
+        would leave out of the board or towards a obstacle
+        '''
+        self.actions = {}
+
+        for state in range(0, self.cart2s((self.rows-1, self.cols-1, self.height-1))+1):
+            self.actions[state] = list((0,1,2,3,4,5,6,7))
+            action=0
+            while action<=7: 
+                ni,nj,nk = self.test_move(action,state)
+                if not self.is_onboard((ni,nj,nk)) or not self.is_onboard(self.s2cart(state)):
+                    self.removeAction(action,state)
+                action+=1
+
+    
     def set_bounds(self, startPosition, row, col, grid_size):
-        x, y, z = startPosition
+        ##Se for usar, consertar pra i,j 
+        #
+        #
+        #
+        #
 
-        new_x, new_y, new_z = x - int(grid_size/2), y - int(grid_size/2), 0
+        i, j, k = startPosition
+
+        new_i, new_j, new_k = i - int(grid_size/2), j - int(grid_size/2), 0
         if grid_size % 2 == 0: #If grid size is a even number
-            end_x, end_y, end_z = x + int(grid_size/2) - 1, y + int(grid_size/2) - 1, 0
+            end_i, end_j, end_k = i + int(grid_size/2) - 1, j + int(grid_size/2) - 1, 0
         else:
-            end_x, end_y, end_z = x + int(grid_size/2) - 0 , y + int(grid_size/2)-0 , 0
+            end_i, end_j, end_k = i + int(grid_size/2) - 0 , j + int(grid_size/2)- 0 , 0
 
-        if new_x < 0:
-            new_x = 0
-            end_x = x + grid_size - 1
+        if new_i < 0:
+            new_i = 0
+            end_i = i + (grid_size - 1)
         
-        if new_y < 0:
-            new_y = 0
-            end_y = y + grid_size - 1
+        if new_j < 0:
+            new_j = 0
+            end_j = j + (grid_size - 1)
 
-        if end_x > row -1:
-            new_x = row - grid_size
-            end_x = row - 1
+        if end_i > row -1:
+            new_i = row - grid_size
+            end_i = row - 1
 
-        if end_y > col -1:
-            new_y = col - grid_size
-            end_y = col - 1
+        if end_j > col -1:
+            new_j = col - grid_size
+            end_j = col - 1
 
-        self.setMiniGrid((new_x, new_y, new_z), (end_x, end_y, end_z))
+        self.setMiniGrid((new_i, new_j, new_k), (end_i, end_j, end_k))
 
-        return [(new_x, new_y, new_z), (end_x, end_y, end_z)]
+        return [(new_i, new_j, new_k), (end_i, end_j, end_k)]
     
     def get_empty_cell_minigrid(self):
-        xi, yi, _ = self.initGrid
-        xe, ye, _ = self.endGrid
-        obstacles = []
-        for i in range(xi, xe + 1):
-            for j in range(yi, ye + 1):
+        ii, ji, _ = self.initGrid
+        ie, je, _ = self.endGrid
+        nonobstacles = []
+        for i in range(ii, ie + 1):
+            for j in range(ji, je + 1):
                 if self.cart2s((i, j, 0)) not in self.get_obstacles():
-                    obstacles.append(self.cart2s((i, j, 0)))
-        return obstacles
+                    nonobstacles.append(self.cart2s((i, j, 0)))
+        return nonobstacles
+    
+    def get_empty_cell_minigrid2(self, init:tuple, end:tuple):
+        ii, ji, _ = init
+        ie, je, _ = end
+        nonobstacles = []
+        for i in range(ii, ie + 1):
+            for j in range(ji, je + 1):
+                if self.cart2s((i, j, 0)) not in self.get_obstacles():
+                    nonobstacles.append(self.cart2s((i, j, 0)))
+        return nonobstacles
         
     
     def set_mindist_goal(self, start_grid:tuple, end_grid:tuple, goal_position:int, minigrid_size:int):
-        xi, yi, zi = start_grid
-        xe, ye, ze = end_grid
-        xg, yg, zg = goal_position
+        ii, ji, ki = start_grid
+        ie, je, ke = end_grid
+        ig, jg, kg = goal_position
         print('minigrid', goal_position)
         min_dist = 10000
-        for i in range(xi, xe + 1):
-            for j in range(yi, ye + 1):
-                if abs(i - xg) + abs(j - yg) < min_dist:
+        for i in range(ii, ie + 1):
+            for j in range(ji, je + 1):
+                if abs(i - ig) + abs(j - jg) < min_dist:
                     if self.cart2s((i, j, 0)) not in self.get_obstacles():
-                        min_dist = abs(i - xg) + abs(j - yg)
+                        min_dist = abs(i - ig) + abs(j - jg)
                         goal = (i, j, 0)
         self.setGoal(goal=goal)
         print('GOAL: ', goal)
         return goal
 
-    def get_bounds(self, start_position:tuple, row:int, col:int, action:int, grid_size:int):
-        x, y, z = start_position
+    def get_bounds(self, start_position:tuple, row:int, col:int, action:int, grid_size:int) -> list:
+        i, j, k = start_position
         
         if action == 0: # If action equals zero, so the agente must go down
-            start_x, start_y, start_z = x - int(grid_size/2), y , 0
-            end_x, end_y, end_z = x + int(grid_size/2), y + grid_size - 1, 0
+            start_i, start_j, start_k = i , j- int(grid_size/2) , 0
+            end_i, end_j, end_k = i + (grid_size-1), j + int(grid_size/2), 0
 
-          #  return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+          #  return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
 
         elif action == 1: # If action equals one, so the agente must go up
-            start_x, start_y, start_z = x - int(grid_size/2), y - grid_size + 1, 0
-            end_x, end_y, end_z = x + int(grid_size/2), y, 0
+            start_i, start_j, start_k = i - (grid_size-1), j- int(grid_size/2) , 0
+            end_i, end_j, end_k = i , j + int(grid_size/2), 0
 
-          #  return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+          #  return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 2: # If action equals two, so the agent must go right
-            start_x, start_y, start_z = x, y - int(grid_size/2), 0
-            end_x, end_y, end_z = x + grid_size - 1, y + int(grid_size/2), 0
+            start_i, start_j, start_k = i-int(grid_size/2), j , 0
+            end_i, end_j, end_k = i +  int(grid_size/2),  j+(grid_size-1), 0
 
-           # return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+           # return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 3: # If action equals three, so the agent must go left
-            start_x, start_y, start_z = x - grid_size + 1, y - int(grid_size/2), 0
-            end_x, end_y, end_z = x, y + int(grid_size/2), 0
+            start_i, start_j, start_k = i-int(grid_size/2), j - (grid_size-1), 0
+            end_i, end_j, end_k = i+int(grid_size/2), j , 0
 
-          #  return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+          #  return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 4: # If action equals four, so the agent must go down-right
-            start_x, start_y, start_z = x , y , 0
-            end_x, end_y, end_z = x + grid_size - 1, y + grid_size - 1, 0
+            start_i, start_j, start_k = i , j , 0
+            end_i, end_j, end_k = i + grid_size - 1, j + grid_size - 1, 0
 
-           # return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+           # return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 5: # If action equals five, so the agent must go down-left
-            start_x, start_y, start_z = x - grid_size + 1, y, 0
-            end_x, end_y, end_z = x, y + grid_size - 1, 0
+            start_i, start_j, start_k = i, j-(grid_size-1), 0
+            end_i, end_j, end_k = i+(grid_size-1), j, 0
 
-          #  return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+          #  return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 6: # If action equals six, so the agent must go up-right
-            start_x, start_y, start_z = x , y - grid_size + 1, 0
-            end_x, end_y, end_z = x + grid_size - 1, y, 0
+            start_i, start_j, start_k = i-(grid_size-1) , j , 0
+            end_i, end_j, end_k = i ,j+(grid_size-1) , 0
 
-           # return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+           # return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
         
         elif action == 7: # If action equals seven, so the agent must go up-left
-            start_x, start_y, start_z = x - grid_size + 1, y - grid_size + 1, 0
-            end_x, end_y, end_z = x, y, 0
+            start_i, start_j, start_k = i - (grid_size-1), j - (grid_size-1), 0
+            end_i, end_j, end_k = i, j, 0
 
-            #return [(start_x, start_y, start_z), (end_x, end_y, end_z)]
+            #return [(start_i, start_j, start_k), (end_i, end_j, end_k)]
 
         else: # Otherwise the agent must be in the center of grid
-            start_x, start_y, start_z = x - int(grid_size/2), y - int(grid_size/2), 0
-            end_x, end_y, end_z = x + int(grid_size/2), y + int(grid_size/2), 0
+            start_i, start_j, start_k = i - int(grid_size/2), j - int(grid_size/2), 0
+            end_i, end_j, end_k = i + int(grid_size/2), j + int(grid_size/2), 0
             
-        return [(max(0, start_x), max(0, start_y), max(0, start_z)), (min(row - 1, end_x), min(col - 1, end_y), 0)]
+        return [(max(0, start_i), max(0, start_j), 0), (min(row - 1, end_i), min(col - 1, end_j), 0)]
+    
+    def get_last_action(self, previous_state:tuple, current_state:tuple) -> int:
+        i_p, j_p, k_p = previous_state
+        i_c, j_c, k_c = current_state
+
+        if (i_c == i_p + 1) and (j_c == j_p):
+            return 0
+        
+        elif (i_c == i_p - 1) and (j_c == j_p):
+            return 1
+        
+        elif (i_c == i_p) and (j_c == j_p + 1):
+            return 2
+        
+        elif (i_c == i_p) and (j_c == j_p - 1):
+            return 3
+        
+        elif (i_c == i_p + 1) and (j_c == j_p + 1):
+            return 4
+        
+        elif (i_c == i_p + 1) and (j_c == j_p - 1):
+            return 5
+        
+        elif (i_c == i_p - 1) and (j_c == j_p + 1):
+            return 6
+        
+        elif (i_c == i_p - 1) and (j_c == j_p - 1):
+            return 7
+
 
 class local_planner:
     def __init__(self, index:int, kd:float, ks:float, kt:float, kg:float, startPos=(0,0,0), grid_size=7, numEpisode=1000,
@@ -200,6 +265,8 @@ class local_planner:
         self.rate = rospy.Rate(10)
         self.best_path = Float64MultiArray()
 
+        self._visited_states = list()
+        self._last_action = None
         self.__index = index
         self.__ks = ks
         self.__kd = kd
@@ -209,16 +276,11 @@ class local_planner:
         self.__grid_size = grid_size
         self.__numEpisode = numEpisode
         self.__alpha = alpha
-
+        self.__current_state = 0
         self._empty_cell_minigrid = list()
 
-        
-
-
-        
 
         self.__load_our_map()
-        
         self.__create_our_grid_world()
         self.__create_our_mini_grid()
         self.__create_our_agent()
@@ -226,7 +288,7 @@ class local_planner:
     
     def callbackpos(self, msg:Point):
         self.__current_position = msg
-       # 
+
     
     def callback(self, data:Float64MultiArray):
         if self.flag == 0:
@@ -236,55 +298,53 @@ class local_planner:
             self.__create_our_agent()
             self.__train_agent()
 
+
         x_max = 7.35
         y_max = 4.8
         cell_size = .6
         self.multi_array = data
         state_list = list()
 
-       # teste = [3.503674030303955, 3.932750940322876, 0.9141186475753784, 5.610137462615967, 3.3981847763061523,
-       #  0.8829743266105652, 6.169996738433838, 0.8000350594520569, 0.9061737656593323, 2.9267265796661377, 0.7945838570594788, 0.9559198021888733]
-       # print(len(self.multi_array.data))
         for i in range(0, len(self.multi_array.data), 3):
             _, _, cell = opt2position(x_max, y_max, cell_size, self.multi_array.data[i:i+3])
-        #    print(cell)
             state_list.append(cell)
-        
-        
-
-
-       
-            
-        
         self.multi_array.data = state_list
 
 
-        y, x, current_position = opt2position(x_max, y_max, cell_size, (self.__current_position.x, self.__current_position.y))#self.__grid_world.s2cart(self.multi_array.data[0])
-        self.__startPos[0] = x
-        self.__startPos[1] = y
-        obs_in_path = set(self.best_path.data) & set(self.multi_array.data) # Interseção entre dois conjuntos
-        obs_in_minigrid = set(self._empty_cell_minigrid) & set(self.multi_array.data)
-        #print(self.best_path.data)
-        #print(obs_in_path)
-        print(f"obs: {state_list}, drone:{current_position} {y, x}", end='\r')
-        #print(f'new obstacles in minigrid: {obs_in_minigrid}, len: {len(obs_in_minigrid)}')
+        xcell, ycell, current_position = opt2position(x_max, y_max, cell_size, (self.__current_position.x, self.__current_position.y))
+        i_c, j_c = ycell, xcell
+        self.__current_state = current_position
+        self.__startPos[0] = i_c
+        self.__startPos[1] = j_c
+
+        if current_position not in self._visited_states:
+            self._visited_states.append(current_position)
+        
+        if len(self._visited_states) == 2:
+            self._last_action = self.__mini_grid.get_last_action(self.__mini_grid.s2cart(self._visited_states[0]), self.__mini_grid.s2cart(self._visited_states[1]))
+            print('\n', self._last_action, '\n')
+            del self._visited_states[0]
+        
+        action = self.__localAgent.chooseBestAction(self.__current_state)
+        init, end = self.__mini_grid.get_bounds(self.__startPos, self.__row, self.__col, action, self.__grid_size)
+        previous_empty_cells = self.__mini_grid.get_empty_cell_minigrid2(init, end)
         
 
-        if (len(obs_in_path) > 0):
-         #   print(np.where(np.array(self.best_path.data) == current_position))
-            index_current_position = np.where(np.array(self.best_path.data) == current_position)[0][0]
-            obs_forward_the_agent = [True for obs in obs_in_path if np.where(np.array(self.best_path.data) == obs)[0][0] > index_current_position]
-            if True in obs_forward_the_agent:
-                self.__obstacles = sorted(self.multi_array.data)
-                self.__create_our_grid_world()
-                self.__create_our_mini_grid()
-                self.__create_our_agent()
-                self.__train_agent()
+        obs_in_path = set(self.best_path.data) & set(self.multi_array.data)           # Interseção entre dois conjuntos
+        obs_in_minigrid = set(previous_empty_cells) & set(self.multi_array.data) # Interseção entre dois conjunto
+        #obs_in_minigrid = set(self._empty_cell_minigrid) & set(self.multi_array.data) # Interseção entre dois conjunto
+    
+        
+
+        
+        #print(self.best_path.data)
+        #print(obs_in_path)
+        print(f"obs: {state_list}, drone:{current_position} {i_c, j_c}, obsminigrid: {obs_in_minigrid}", end='\r')
+
         
 
         try:
-            if self.best_path.data[-2] == current_position:
-                #print('entrei aqui')
+            if current_position in self.best_path.data[-2:]:
                 self.__obstacles = sorted(self.multi_array.data)
                 self.__create_our_grid_world()
                 self.__create_our_mini_grid()
@@ -294,7 +354,6 @@ class local_planner:
             pass
 
         if (len(obs_in_minigrid) > 0):
-            print('recalculei', end='\r')
             self.__obstacles = sorted(self.multi_array.data)
             self.__create_our_grid_world()
             self.__create_our_mini_grid()
@@ -353,25 +412,38 @@ class local_planner:
         
         # Modificacao novo minigrid
         try:
-            action = self.__localAgent.chooseBestAction(self.__grid_world.cart2s(self.__startPos))
+            if self._last_action != None:
+                action = self._last_action
+            else:
+                action = self.__localAgent.chooseBestAction(self.__current_state)
             init_grid, end_grid = self.__mini_grid.get_bounds(self.__startPos, self.__row, self.__col, action, self.__grid_size)
+            print(f'\ncurrent action: {action}')
+            print(f'\ninit: {init_grid}\nend: {end_grid}\n')
+            self.__mini_grid.setMiniGrid(init_grid, end_grid)
         except AttributeError:
             init_grid, end_grid = self.__mini_grid.set_bounds(self.__startPos, self.__row, self.__col, self.__grid_size)
         self.__mini_grid.setPosition(self.__startPos)
         self.__mini_grid.set_mindist_goal(init_grid, end_grid, self.__goal_position, self.__grid_size)
         self.__mini_grid.actionSpace()
+        if self._last_action != None:
+            self.__mini_grid.last_action = self._last_action
+            self.__mini_grid.get_energyCost()
         self.__mini_grid.get_reward_safety()
 
         #print(self.__mini_grid.get_bounds((0,0,0), 10, 10, 4, 5))
     
     def __create_our_agent(self):
-        self.__localAgent=qla(alpha=self.__alpha, epsilon=.5)
+        self.__localAgent=qla(alpha=self.__alpha, epsilon=.3)
         self.__localAgent.setEnviroment(self.__mini_grid)
         self.__localAgent.setQtable(self.__row * self.__col, 8)
-        self.__localAgent.setEpsilon(0, [1, .1, self.__numEpisode])
+        self.__localAgent.setEpsilon(1, [.8, .1, self.__numEpisode])
         self.__localAgent.setAlpha(0, [self.__alpha, .1, self.__numEpisode])
-        self.__localAgent.exploringStarts(self.__grid_size, self.__grid_size, self.__mini_grid.initGrid)
-        #self.__localAgent.exploringStarts(1, 1, self.__startPos)
+
+        length_i = self.__mini_grid.endGrid[0] - self.__mini_grid.initGrid[0] + 1
+        length_j = self.__mini_grid.endGrid[1] - self.__mini_grid.initGrid[1] + 1
+
+        #self.__localAgent.exploringStarts(length_i, length_j, self.__mini_grid.initGrid)
+        self.__localAgent.exploringStarts(1, 1, self.__startPos)
     
     def __train_agent(self):
         init=time.time() * 1000
@@ -379,27 +451,20 @@ class local_planner:
         self._empty_cell_minigrid = self.__mini_grid.get_empty_cell_minigrid()
         fim=time.time() * 1000 - init
         print(fim)
-        #print(self.__localAgent.getBestPath(self.__startPos))
 
-        #teste = [3.449720859527588, 3.9794921875, 0.9147161245346069, 5.6061530113220215, 3.4011101722717285, 0.8833327889442444, 6.160008430480957,
-        # 0.7659165859222412, 0.9063773155212402, 2.6224820613861084, 0.34377673268318176, 0.9608232975006104]
-
-        #for i in range(0, len(teste), 3):
-        #    _, _, cell = opt2position(7.5, 4.73, .6, teste[i:i+3])
-        #    print(cell)
-        #    print(cell2opt(7.35, 4.8, .6, cell))
 
         self.__grid_world.PrintBestPath(self.__localAgent.getQtable(), 0, self.__localAgent.getBestPath(self.__startPos))
         self.best_path.data = self.__localAgent.getBestPath(self.__startPos)
+        print(f'Dijkstra Path: {self.__localAgent.getDijkstraPath(self.__startPos)}')
         print(f'startPos:{self.__startPos}, Best path:{self.best_path.data}')
         self.global_path.publish(self.best_path)
         self.flag = 1
+        #dijsktra = list(self.__localAgent.getDijkstraPath(self.__startPos))
+        #print('\n\n')
+        #self.__grid_world.PrintBestPath(self.__localAgent.getQtable(), 0, dijsktra)
+        #self.__mini_grid.printMiniGrid(self.__mini_grid.initGrid, self.__mini_grid.endGrid, self.best_path.data, self.best_path.data, self.__localAgent.getQtable())
 
-        #asda = []
-        #for i in self.__grid_world.get_obstacles():
-        #    asda.append(cell2opt(7.35, 4.8, .6, i))
-        #print(asda)
-    
+
     def _check_diagonal_obstacles(self, obstacles_list:list)-> list:
         new_list_obstacles = obstacles_list.copy()
         for obstacle in obstacles_list:
@@ -415,7 +480,7 @@ class local_planner:
         
 if __name__ == '__main__':
     try:
-        a1 = local_planner(24, -.6, -.1, -.6, 100, alpha=.3, grid_size=5)
+        a1 = local_planner(24, -.4, -.1, -.4, 100, alpha=.1, grid_size=5, numEpisode=1000)
         rospy.spin()
 
 

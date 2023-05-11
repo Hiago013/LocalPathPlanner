@@ -25,8 +25,8 @@ class GridWorld:
 
         # set initial position
         self.start = start
-        self.i = start[0] #starting x
-        self.j = start[1] #starting y
+        self.i = start[0] #starting row
+        self.j = start[1] #starting col
         self.k = 0
 
         # set goal position
@@ -93,31 +93,31 @@ class GridWorld:
     
     def cart2s(self, cartesian_position):
         ''' returns the position in the cell given the 3D Cartesian coordinate 
-        (x, y, z) -> s
+        (i, j, k) -> s
         '''
-        x, y, z = cartesian_position
-        s = self.cols * x + y + self.cols * self.rows * z
+        i, j, k = cartesian_position
+        s = self.cols * i + j + self.cols * self.rows * k
         return s
     
     def s2cart(self, s_position):
         ''' returns the position in the 3D Cartesian coordinate given the cell
-        s -> (x, y, z)
+        s -> (i, j, k)
         '''
         numCelInCrossSection = self.rows * self.cols
-        x = int(s_position /(self.cols))
-        y = s_position % (self.cols)
-        z = 0
+        i = int(s_position /(self.cols))
+        j = s_position % (self.cols)
+        k = 0
 
         if s_position < numCelInCrossSection:
-            return (x, y, z)
+            return (i, j, k)
 
         else:
             while s_position >= numCelInCrossSection:
                 s_position -= numCelInCrossSection
-                z += 1
-            x = int(s_position /(self.cols))
-            y = s_position % (self.cols)
-            return (x, y, z)
+                k += 1
+            i = int(s_position /(self.cols))
+            j = s_position % (self.cols)
+            return (i, j, k)
 
     def test_move(self,action,state):
         i,j,k=self.s2cart(state)
@@ -378,8 +378,8 @@ class GridWorld:
         '''
         checks if the agent is in the environment and return true or false
         '''
-        x, y, z = cartesian_position
-        if x < 0 or x >= self.rows or y < 0 or y >= self.cols or z < 0 or z >= self.height:
+        i, j, k = cartesian_position
+        if i < 0 or i >= self.rows or j < 0 or j >= self.cols or k < 0 or k >= self.height:
             return 0
         return 1
     

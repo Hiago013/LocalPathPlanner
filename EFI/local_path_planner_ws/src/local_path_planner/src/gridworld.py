@@ -25,8 +25,8 @@ class GridWorld:
 
         # set initial position
         self.start = start
-        self.i = start[0] #starting x
-        self.j = start[1] #starting y
+        self.i = start[0] #starting i
+        self.j = start[1] #starting j
         self.k = 0
 
         # set goal position
@@ -63,35 +63,35 @@ class GridWorld:
         self.i, self.j, self.k = position
     
     def refine_reward(self, action:int, previous_position:tuple, current_position:tuple):
-        x_p, y_p, z_p = previous_position
-        x_c, y_c, z_c = current_position
-        k = 9
-        if action == 4: ## ARRUMAR y_c -1 > 0
+        i_p, j_p, k_p = previous_position
+        i_c, j_c, k_c = current_position
+        k = 20
+        if action == 4: ## ARRUMAR j_c -1 > 0
             
-            if (self.cart2s((x_c, y_c - 1, z_c)) in self.get_obstacles()) and (y_c > 0) or \
-            (self.cart2s((x_c - 1, y_c, z_c)) in self.get_obstacles()) and (x_c > 0):
+            if (self.cart2s((i_c, j_c - 1, k_c)) in self.get_obstacles()) and (j_c > 0) or \
+            (self.cart2s((i_c - 1, j_c, k_c)) in self.get_obstacles()) and (i_c > 0):
               #  print('entrei4', self.cart2s(current_position))
-              #  print(self.cart2s((x_c -1, y_c, z_c)), self.cart2s((x_c , y_c - 1, z_c)))
-                return self.Kd * k
+              #  print(self.cart2s((i_c -1, j_c, k_c)), self.cart2s((i_c , j_c - 1, k_c)))
+                return 1#self.Kd * k
             
         elif action == 5:
-            if (self.cart2s((x_c, y_c + 1, z_c)) in self.get_obstacles()) and (y_c < self.rows - 1)or \
-            (self.cart2s((x_c - 1, y_c, z_c)) in self.get_obstacles()) and (x_c > 0):
+            if (self.cart2s((i_c, j_c + 1, k_c)) in self.get_obstacles()) and (j_c < self.cols - 1)or \
+            (self.cart2s((i_c - 1, j_c, k_c)) in self.get_obstacles()) and (i_c > 0):
                # print('entrei5')
-                return self.Kd * k
+                return 1#self.Kd * k
 
         elif action == 6:
-            if (self.cart2s((x_c, y_c - 1, z_c)) in self.get_obstacles()) and (y_c > 0) or \
-            (self.cart2s((x_c + 1, y_c, z_c)) in self.get_obstacles()) and (x_c < self.cols- 1):
+            if (self.cart2s((i_c, j_c - 1, k_c)) in self.get_obstacles()) and (j_c > 0) or \
+            (self.cart2s((i_c + 1, j_c, k_c)) in self.get_obstacles()) and (i_c < self.rows- 1):
                 #print('entrei6')
-                return self.Kd * k
+                return 1#self.Kd * k
         
 
         elif action == 7:
-            if (self.cart2s((x_c +1, y_c, z_c)) in self.get_obstacles()) and (x_c < self.cols - 1) or \
-            (self.cart2s((x_c , y_c + 1, z_c)) in self.get_obstacles()) and (y_c < self.rows - 1):
+            if (self.cart2s((i_c +1, j_c, k_c)) in self.get_obstacles()) and (i_c < self.rows - 1) or \
+            (self.cart2s((i_c , j_c + 1, k_c)) in self.get_obstacles()) and (j_c < self.cols - 1):
                 #print('entrei7')
-                return self.Kd * k
+                return 1#self.Kd * k
 
         return 0
 
@@ -127,40 +127,42 @@ class GridWorld:
     
     def cart2s(self, cartesian_position):
         ''' returns the position in the cell given the 3D Cartesian coordinate 
-        (x, y, z) -> s
+        (i, j, k) -> s
         '''
-        x, y, z = cartesian_position
-        s = self.cols * x + y + self.cols * self.rows * z
+        i, j, k = cartesian_position
+        s = self.cols * i + j + self.cols * self.rows * k
         return s
     
     def s2cart(self, s_position):
         ''' returns the position in the 3D Cartesian coordinate given the cell
-        s -> (x, y, z)
+        s -> (i, j, k) 
         '''
         numCelInCrossSection = self.rows * self.cols
-        x = int(s_position /(self.cols))
-        y = s_position % (self.cols)
-        z = 0
+        i = int(s_position /(self.cols))
+        j = s_position % (self.cols)
+        k = 0
 
         if s_position < numCelInCrossSection:
-            return (x, y, z)
+            return (i, j, k)
 
         else:
             while s_position >= numCelInCrossSection:
                 s_position -= numCelInCrossSection
-                z += 1
-            x = int(s_position /(self.cols))
-            y = s_position % (self.cols)
-            return (x, y, z)
+                k += 1
+            i = int(s_position /(self.cols))
+            j = s_position % (self.cols)
+            return (i, j, k) 
 
     def test_move(self,action,state):
-        i,j,k=self.s2cart(state)
-        ai=self.i
-        aj=self.j
-        ak=self.k
-        self.i=i
-        self.j=j
-        self.k=k
+        i, j, k =self.s2cart(state)
+
+        ai = self.i
+        aj = self.j
+        ak = self.k
+
+        self.i = i
+        self.j = j
+        self.k = k
 
         if action == 0:  
             new_i = self.i+1
@@ -286,7 +288,10 @@ class GridWorld:
         
         reward += self.reward_safety[(new_i, new_j, new_k)] # reward of safety
         reward += self.get_reward() # reward of distance and energy
-        reward += self.refine_reward(action, (self.i, self.j, self.k), (new_i, new_j, new_k)) ## LINHA DO "TIRA QUINA"
+        if self.refine_reward(action, (self.i, self.j, self.k), (new_i, new_j, new_k)):
+            reward -= self.Kg
+            self.done = True
+        #reward += self.refine_reward(action, (self.i, self.j, self.k), (new_i, new_j, new_k)) ## LINHA DO "TIRA QUINA"
         new_state = (new_i, new_j, new_k)
 
         if new_state == self.goal:
@@ -332,17 +337,17 @@ class GridWorld:
                 for k in range(self.height):
                     obstacleList = []
                     for obstacle in self.obstacles:
-                        ox, oy, oz = self.s2cart(obstacle)
+                        oi, oj, ok = self.s2cart(obstacle)
                         #oz=oz/2
-                        distance = np.sqrt((i - ox)**2 + (j - oy)**2 + (k - oz)**2)
+                        distance = np.sqrt((i - oi)**2 + (j - oj)**2 + (k - ok)**2)
                         obstacleList.append(distance)
                     obstacleList.sort()
                     obstacleList = obstacleList[0:10]
                     penalty = 0
                     
 
-                    for y in range(len(obstacleList)):
-                        penalty += min(0, (3 - obstacleList[y]) * self.Kd)
+                    for it in range(len(obstacleList)):
+                        penalty += min(0, (3 - obstacleList[it]) * self.Kd)
                                        
                     reward_safety[i][j][k] = penalty * reward_safety[i][j][k]
         self.reward_safety = reward_safety + reward_step
@@ -360,9 +365,9 @@ class GridWorld:
             #print(self.actions[state])
             action=0
             while action<=7: 
-                nx,ny,nz=self.test_move(action,state)
+                ni,nj,nk = self.test_move(action,state)
                 #print(nx,ny,nz, ' For action',action, 'in state',state)
-                if self.is_onboard((nx,ny,nz)):
+                if self.is_onboard((ni,nj,nk)):
                     pass
                 else:
                     #print('Removing Action',action,' From state',state)
@@ -413,8 +418,8 @@ class GridWorld:
         '''
         checks if the agent is in the environment and return true or false
         '''
-        x, y, z = cartesian_position
-        if x < 0 or x >= self.rows or y < 0 or y >= self.cols or z < 0 or z >= self.height:
+        i, j, k = cartesian_position
+        if i < 0 or i >= self.rows or j < 0 or j >= self.cols or k < 0 or k >= self.height:
             return 0
         return 1
     
@@ -505,9 +510,9 @@ class GridWorld:
             i,j,k=self.s2cart(cell)
             k/=2
             for obstacle in self.obstacles:
-                ox, oy, oz = self.s2cart(obstacle)
+                oi, oj, ok = self.s2cart(obstacle)
                 #oz=oz/2
-                distance = np.sqrt((i - ox)**2 + (j - oy)**2 + (k - oz)**2)
+                distance = np.sqrt((i - oi)**2 + (j - oj)**2 + (k - ok)**2)
                 obstacleList.append(distance)
             obstacleList.sort()
             dist.append(sum(obstacleList[0:10]))
@@ -775,26 +780,26 @@ class GridWorld:
 
     def  demolish(self,states:list):
         #returns a list of obstacles that surrounds the list of states
-        ExtObs=[]
+        EitObs=[]
         for s in states:
-            x,y,z=self.s2cart(s)
-            if self.cart2s((x+1,y,z)) not in ExtObs and self.is_onboard((x+1,y,z)) and self.cart2s((x+1,y,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x+1,y,z)))
-            if self.cart2s((x+1,y+1,z)) not in ExtObs and self.is_onboard((x+1,y+1,z)) and self.cart2s((x+1,y+1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x+1,y+1,z)))
-            if self.cart2s((x+1,y-1,z)) not in ExtObs and self.is_onboard((x+1,y-1,z)) and self.cart2s((x+1,y-1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x+1,y-1,z)))
-            if self.cart2s((x,y,z)) not in ExtObs and self.is_onboard((x,y,z)) and self.cart2s((x,y,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x,y,z)))
-            if self.cart2s((x,y+1,z)) not in ExtObs and self.is_onboard((x,y+1,z)) and self.cart2s((x,y+1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x,y+1,z)))
-            if self.cart2s((x,y-1,z)) not in ExtObs and self.is_onboard((x,y-1,z)) and self.cart2s((x,y-1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x,y-1,z)))
-            if self.cart2s((x-1,y,z)) not in ExtObs and self.is_onboard((x-1,y,z)) and self.cart2s((x-1,y,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x+1,y,z)))
-            if self.cart2s((x-1,y+1,z)) not in ExtObs and self.is_onboard((x-1,y+1,z)) and self.cart2s((x-1,y+1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x-1,y+1,z)))
-            if self.cart2s((x-1,y-1,z)) not in ExtObs and self.is_onboard((x-1,y-1,z)) and self.cart2s((x-1,y-1,z)) not in self.obstacles:
-                ExtObs.append(self.cart2s((x-1,y-1,z)))
+            i,j,jk=self.s2cart(s)
+            if self.cart2s((i+1,j,jk)) not in EitObs and self.is_onboard((i+1,j,jk)) and self.cart2s((i+1,j,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i+1,j,jk)))
+            if self.cart2s((i+1,j+1,jk)) not in EitObs and self.is_onboard((i+1,j+1,jk)) and self.cart2s((i+1,j+1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i+1,j+1,jk)))
+            if self.cart2s((i+1,j-1,jk)) not in EitObs and self.is_onboard((i+1,j-1,jk)) and self.cart2s((i+1,j-1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i+1,j-1,jk)))
+            if self.cart2s((i,j,jk)) not in EitObs and self.is_onboard((i,j,jk)) and self.cart2s((i,j,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i,j,jk)))
+            if self.cart2s((i,j+1,jk)) not in EitObs and self.is_onboard((i,j+1,jk)) and self.cart2s((i,j+1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i,j+1,jk)))
+            if self.cart2s((i,j-1,jk)) not in EitObs and self.is_onboard((i,j-1,jk)) and self.cart2s((i,j-1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i,j-1,jk)))
+            if self.cart2s((i-1,j,jk)) not in EitObs and self.is_onboard((i-1,j,jk)) and self.cart2s((i-1,j,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i+1,j,jk)))
+            if self.cart2s((i-1,j+1,jk)) not in EitObs and self.is_onboard((i-1,j+1,jk)) and self.cart2s((i-1,j+1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i-1,j+1,jk)))
+            if self.cart2s((i-1,j-1,jk)) not in EitObs and self.is_onboard((i-1,j-1,jk)) and self.cart2s((i-1,j-1,jk)) not in self.obstacles:
+                EitObs.append(self.cart2s((i-1,j-1,jk)))
 
-        return ExtObs
+        return EitObs
